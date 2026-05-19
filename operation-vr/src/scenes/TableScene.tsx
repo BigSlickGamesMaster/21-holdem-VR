@@ -1,7 +1,7 @@
 import { OrbitControls } from '@react-three/drei'
-import { useThree } from '@react-three/fiber'
-import { useEffect, useMemo, useState } from 'react'
-import { Shape } from 'three'
+import { useFrame, useThree } from '@react-three/fiber'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { CanvasTexture, LinearFilter, Shape } from 'three'
 import { ActionButton3D } from '../components/betting/ActionButton3D'
 import { RaiseChipSelector, type BetChipSelection } from '../components/betting/RaiseChipSelector'
 import { TableConsole } from '../components/betting/TableConsole'
@@ -10,13 +10,12 @@ import { ChipStack } from '../components/chips/ChipStack'
 import { CasinoRoom } from '../components/table/CasinoRoom'
 import { TableModel } from '../components/table/TableModel'
 import { CanvasLabel } from '../components/vr/CanvasLabel'
-import { formatChips } from '../game/rules/formatChips'
 import { getLegalActions } from '../game/rules/legalActions'
 import { calculateHandTotal, playerScoringCards } from '../game/rules/handTotals'
 import { buildPots } from '../game/rules/pots'
 import { getRaiseOptions } from '../game/rules/raiseOptions'
 import { resolveShowdown } from '../game/rules/showdown'
-import { useGameStore } from '../game/state/useGameStore'
+import { turnKeyForGame, useGameStore } from '../game/state/useGameStore'
 
 const seatPositions: Record<number, [number, number, number]> = {
   1: [0, 0.835, 1.02],
@@ -36,6 +35,7 @@ const controlY = feltY + 0.018
 const consoleX = 0.25
 const consoleZ = 0.66
 const consoleSize = 0.26
+const actionTimerSeconds = 20
 const potPosition: [number, number, number] = [0, objectY, 0.01]
 const playerChipLeftOffset = 0.24
 const tableSurfaceWidth = 3.24
@@ -66,6 +66,7 @@ export function TableScene() {
   const setSelectedRaiseTo = useGameStore((state) => state.setSelectedRaiseTo)
   const setStagedBetAction = useGameStore((state) => state.setStagedBetAction)
   const startNextHand = useGameStore((state) => state.startNextHand)
+  const applyTimeoutAction = useGameStore((state) => state.applyTimeoutAction)
   const isHumanTurn = game.activePlayerId === 'p1'
   const legalActions = useMemo(() => (isHumanTurn ? getLegalActions(game, game.activePlayerId) : []), [game, isHumanTurn])
   const raiseOptions = useMemo(() => getRaiseOptions(game, game.activePlayerId), [game])
@@ -84,17 +85,16 @@ export function TableScene() {
     [actionMenu, applyAction, legalActions, raiseOptions, selectedRaiseTo, stagedBetAction, setActionMenu, setStagedBetAction],
   )
   const { pots: currentRoundPots } = useMemo(() => buildPots(game.players), [game.players])
-  const visiblePots = useMemo(() => [...(game.pots ?? []), ...currentRoundPots], [currentRoundPots, game.pots])
   const showdown = useMemo(() => (game.phase === 'showdown' ? resolveShowdown(game) : null), [game])
   const potTotal =
     (game.pots ?? []).reduce((sum, pot) => sum + pot.amount, 0) +
     currentRoundPots.reduce((sum, pot) => sum + pot.amount, 0)
   const callAction = legalActions.find((action) => action.type === 'call')
-  const facingBet = isHumanTurn && actionMenu === 'main' && callAction?.type === 'call'
   const canTapCheck = isHumanTurn && actionMenu === 'main' && legalActions.some((action) => action.type === 'check')
   const canFold = isHumanTurn && actionMenu === 'main' && legalActions.some((action) => action.type === 'fold')
   const canStand = isHumanTurn && actionMenu === 'main' && legalActions.some((action) => action.type === 'stand')
   const canSelectBet = isHumanTurn && actionMenu === 'main' && Boolean(raiseOptions)
+  const confirmActive = isHumanTurn && actionMenu === 'bet-intent' && stagedBetAction !== null
   const canStandStagedBet = isHumanTurn && actionMenu === 'bet-intent' && stagedBetAction !== null
   const [foldThrow, setFoldThrow] = useState<{ key: number; dealKey: number; card: (typeof game.players)[number]['holeCards'][number] } | null>(
     null,
@@ -103,6 +103,8 @@ export function TableScene() {
   const [showdownTimer, setShowdownTimer] = useState<{ dealKey: number; startedAt: number } | null>(null)
   const [countdownNow, setCountdownNow] = useState(() => window.performance.now())
   const activeShowdownTimer = showdownTimer?.dealKey === dealAnimationKey ? showdownTimer : null
+  const actionTurnKey = turnKeyForGame(game, dealAnimationKey)
+  const controlTimerKey = `${actionTurnKey}-${actionMenu}-${stagedBetAction?.type ?? 'none'}`
   const nextHandCountdown =
     game.phase === 'showdown' && activeShowdownTimer
       ? Math.max(0, 6 - Math.floor((countdownNow - activeShowdownTimer.startedAt) / 1000))
@@ -130,6 +132,23 @@ export function TableScene() {
       window.clearTimeout(timeout)
     }
   }, [dealAnimationKey, game.phase, startNextHand])
+
+  useEffect(() => {
+    if (game.activePlayerId !== 'p1' || game.phase === 'showdown') {
+      return
+    }
+
+    if (!canTapCheck && !confirmActive) {
+      return
+    }
+
+    const playerId = game.activePlayerId
+    const timeout = window.setTimeout(() => {
+      applyTimeoutAction(playerId, actionTurnKey)
+    }, actionTimerSeconds * 1000)
+
+    return () => window.clearTimeout(timeout)
+  }, [actionTurnKey, applyTimeoutAction, canTapCheck, confirmActive, game.activePlayerId, game.phase])
 
   function throwCardToFold() {
     const human = game.players.find((player) => player.id === 'p1')
@@ -171,8 +190,10 @@ export function TableScene() {
       <TableSurfaceMarks
         players={game.players}
         checkActive={canTapCheck}
-        confirmActive={actionMenu === 'bet-intent' && stagedBetAction !== null}
+        confirmActive={confirmActive}
         nextHandLabel={nextHandLabel}
+        timerActive={(canTapCheck || confirmActive) && game.phase !== 'showdown'}
+        turnTimerKey={controlTimerKey}
       />
       <PlayerHandTotal game={game} />
 
@@ -194,7 +215,7 @@ export function TableScene() {
             onFoldRelease={throwCardToFold}
             canHoverToStand={player.id === 'p1' && cardIndex === 0 && (canStand || canStandStagedBet) && !activeFoldThrow}
             onStandHover={standFromCardHover}
-            warningGlow={player.id === 'p1' && cardIndex === 0 && facingBet && !activeFoldThrow}
+            warningGlow={false}
           />
         ))
       })}
@@ -233,7 +254,6 @@ export function TableScene() {
       })}
 
       {game.phase !== 'showdown' ? <ChipStack amount={potTotal} position={potPosition} layout="pot" /> : null}
-      <PotStatusLabels pots={visiblePots} />
 
       {showdown ? (
         <>
@@ -354,29 +374,6 @@ function AllInMarker({ seat, seatPosition }: { seat: number; seatPosition: [numb
   )
 }
 
-function PotStatusLabels({ pots }: { pots: ReturnType<typeof buildPots>['pots'] }) {
-  if (pots.length <= 1) {
-    return null
-  }
-
-  return (
-    <group>
-      {pots.slice(0, 4).map((pot, index) => (
-        <CanvasLabel
-          key={`${pot.id}-${index}`}
-          text={`${index === 0 ? 'Main' : `Side ${index}`} ${formatChips(pot.amount)}`}
-          position={[-0.34 + index * 0.23, objectY + 0.004, 0.2]}
-          width={0.22}
-          height={0.065}
-          fontSize={54}
-          background="rgba(0, 0, 0, 0)"
-          color={index === 0 ? '#dce8ff' : '#ffec8a'}
-        />
-      ))}
-    </group>
-  )
-}
-
 type VrActionButton = {
   label: string
   onPress: () => void
@@ -456,18 +453,20 @@ function TableSurfaceMarks({
   checkActive,
   confirmActive,
   nextHandLabel,
+  timerActive,
+  turnTimerKey,
 }: {
   players: ReturnType<typeof useGameStore.getState>['game']['players']
   checkActive: boolean
   confirmActive: boolean
   nextHandLabel: string | null
+  timerActive: boolean
+  turnTimerKey: string
 }) {
   const markY = objectY - 0.008
   const nextHandActive = nextHandLabel !== null
-  const consoleText = nextHandLabel ?? (confirmActive ? 'Confirm' : checkActive ? 'Check' : null)
-  const consoleColor = nextHandActive ? '#050608' : confirmActive ? '#5bf08d' : '#8fffc1'
+  const consoleText = nextHandLabel ?? (confirmActive ? 'Confirm' : null)
   const consoleTextColor = nextHandActive ? '#f4f1e8' : confirmActive ? '#d9ffe5' : '#bfffd5'
-  const consoleOpacity = nextHandActive ? 0.72 : confirmActive ? 0.6 : 0.28
 
   return (
     <group>
@@ -496,34 +495,45 @@ function TableSurfaceMarks({
           opacity={0.22}
         />
       ))}
-      {confirmActive || nextHandActive ? (
-        <SurfaceFill
-          position={[consoleX, markY - 0.001, consoleZ]}
-          width={consoleSize}
-          depth={consoleSize}
-          color={nextHandActive ? '#050608' : '#5bf08d'}
-          opacity={nextHandActive ? 0.5 : 0.18}
+      {nextHandActive ? (
+        <TimedSquareFill
+          key={`next-hand-${turnTimerKey}`}
+          position={[consoleX, markY, consoleZ]}
+          color="#f4f1e8"
+          seconds={6}
+          outlineOpacity={0.56}
+        />
+      ) : null}
+      {confirmActive ? (
+        <TimedSquareFill
+          key={`confirm-${turnTimerKey}`}
+          position={[consoleX, markY, consoleZ]}
+          color="#5bf08d"
+          seconds={actionTimerSeconds}
+          outlineOpacity={0.58}
+        />
+      ) : null}
+      {timerActive && !nextHandActive && !confirmActive ? (
+        <TimedSquareFill
+          key={`check-${turnTimerKey}`}
+          position={[consoleX, markY, consoleZ]}
+          color={checkActive ? '#8fffc1' : '#f7f9ff'}
+          seconds={actionTimerSeconds}
+          outlineOpacity={0.5}
         />
       ) : null}
       {consoleText ? (
-        <>
-          <SurfaceSlot
-            position={[consoleX, markY, consoleZ]}
-            width={consoleSize}
-            depth={consoleSize}
-            color={consoleColor}
-            opacity={consoleOpacity}
-          />
+        <group>
           <CanvasLabel
             text={consoleText}
             position={[consoleX, markY + 0.004, consoleZ]}
             width={consoleSize * 0.82}
-            height={consoleSize * 0.28}
-            fontSize={nextHandActive ? 72 : 104}
+            height={consoleSize * 0.36}
+            fontSize={nextHandActive ? 86 : 134}
             background="rgba(0, 0, 0, 0)"
             color={consoleTextColor}
           />
-        </>
+        </group>
       ) : null}
     </group>
   )
@@ -617,27 +627,6 @@ function SurfaceSlot({
   )
 }
 
-function SurfaceFill({
-  position,
-  width,
-  depth,
-  color,
-  opacity,
-}: {
-  position: [number, number, number]
-  width: number
-  depth: number
-  color: string
-  opacity: number
-}) {
-  return (
-    <mesh position={position} rotation={[-Math.PI / 2, 0, 0]}>
-      <planeGeometry args={[width * 0.82, depth * 0.82]} />
-      <meshBasicMaterial color={color} transparent opacity={opacity} depthWrite={false} />
-    </mesh>
-  )
-}
-
 function previewBetSelection(
   selection: BetChipSelection,
   setSelectedRaiseTo: ReturnType<typeof useGameStore.getState>['setSelectedRaiseTo'],
@@ -691,10 +680,103 @@ function communityCardPosition(index: number, y = objectY): [number, number, num
 
 function cardYawForSeat(seat: number) {
   if (seat !== 1) {
-    return opponentTrackSlot(seat).yaw
+    return opponentTrackSlot(seat).yaw + Math.PI
   }
 
   return 0
+}
+
+function TimedSquareFill({
+  position,
+  color,
+  size = 0.26,
+  seconds = 15,
+  outlineOpacity = 0.5,
+}: {
+  position: [number, number, number]
+  color: string
+  size?: number
+  seconds?: number
+  outlineOpacity?: number
+}) {
+  const startRef = useRef<number | null>(null)
+  const duration = seconds
+  const [progress, setProgress] = useState(0)
+
+  useFrame((state) => {
+    startRef.current ??= state.clock.elapsedTime
+    const elapsed = (state.clock.elapsedTime - startRef.current) % duration
+    const nextProgress = elapsed / duration
+
+    setProgress((current) => (Math.abs(current - nextProgress) < 0.01 ? current : nextProgress))
+  })
+
+  const fillWidth = size
+  const fillDepth = size
+  const sweepTexture = useMemo(() => createSquareSweepTexture(progress, color), [color, progress])
+
+  return (
+    <>
+      <SurfaceSlot position={position} width={size} depth={size} color={color} opacity={outlineOpacity} />
+      <mesh position={[position[0], position[1] + 0.003, position[2]]} rotation={[-Math.PI / 2, 0, 0]}>
+        <planeGeometry args={[fillWidth, fillDepth]} />
+        <meshBasicMaterial map={sweepTexture} transparent opacity={0.42} depthWrite={false} />
+      </mesh>
+    </>
+  )
+}
+
+function createSquareSweepTexture(progress: number, color: string) {
+  const canvas = document.createElement('canvas')
+  canvas.width = 512
+  canvas.height = 512
+
+  const context = canvas.getContext('2d')
+  if (!context) {
+    throw new Error('Canvas 2D context unavailable')
+  }
+
+  const remaining = Math.max(0, Math.min(1, 1 - progress))
+  const radius = Math.hypot(canvas.width, canvas.height)
+  const center = canvas.width / 2
+
+  context.clearRect(0, 0, canvas.width, canvas.height)
+  context.save()
+  roundRect(context, 0, 0, canvas.width, canvas.height, 72)
+  context.clip()
+
+  context.fillStyle = color
+  if (remaining >= 0.995) {
+    context.fillRect(0, 0, canvas.width, canvas.height)
+  } else if (remaining > 0) {
+    context.beginPath()
+    context.moveTo(center, center)
+    context.arc(center, center, radius, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * remaining, false)
+    context.closePath()
+    context.fill()
+  }
+
+  context.restore()
+
+  const texture = new CanvasTexture(canvas)
+  texture.minFilter = LinearFilter
+  texture.magFilter = LinearFilter
+  texture.needsUpdate = true
+  return texture
+}
+
+function roundRect(context: CanvasRenderingContext2D, x: number, y: number, width: number, height: number, radius: number) {
+  context.beginPath()
+  context.moveTo(x + radius, y)
+  context.lineTo(x + width - radius, y)
+  context.quadraticCurveTo(x + width, y, x + width, y + radius)
+  context.lineTo(x + width, y + height - radius)
+  context.quadraticCurveTo(x + width, y + height, x + width - radius, y + height)
+  context.lineTo(x + radius, y + height)
+  context.quadraticCurveTo(x, y + height, x, y + height - radius)
+  context.lineTo(x, y + radius)
+  context.quadraticCurveTo(x, y, x + radius, y)
+  context.closePath()
 }
 
 function chipStackPosition(seat: number, position: [number, number, number]): [number, number, number] {

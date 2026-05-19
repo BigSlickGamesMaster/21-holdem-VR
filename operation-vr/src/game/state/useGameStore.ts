@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import { createDemoHand, demoHand } from '../mockData/demoHand'
 import { seatsForNextHand } from '../rules/chipSettlement'
-import { applyPlayerAction } from '../rules/handEngine'
+import { applyPlayerAction, applyTimeoutFold } from '../rules/handEngine'
 import type { GameState, PlayerActionInput } from '../types/game'
 
 export type ActionMenu = 'main' | 'raise-size' | 'raise-intent' | 'bet-intent'
@@ -20,6 +20,7 @@ type GameStore = {
   }
   applyAction: (action: PlayerActionInput) => void
   applyBotAction: (action: PlayerActionInput) => void
+  applyTimeoutAction: (playerId: string, turnKey: string) => void
   setAutoplayOpponents: (enabled: boolean) => void
   setShowDebugTrace: (enabled: boolean) => void
   setActionMenu: (menu: ActionMenu) => void
@@ -75,6 +76,26 @@ export const useGameStore = create<GameStore>((set) => ({
             : `${activePlayer.name} ${result.label.toLowerCase()}.`,
       }
     }),
+  applyTimeoutAction: (playerId, turnKey) =>
+    set((state) => {
+      const activePlayer = state.game.players.find((player) => player.id === state.game.activePlayerId)
+      const currentTurnKey = turnKeyForGame(state.game, state.dealAnimationKey)
+      if (!activePlayer || activePlayer.id !== playerId || currentTurnKey !== turnKey) {
+        return state
+      }
+
+      const result = applyTimeoutFold(state.game, playerId)
+      return {
+        game: result.game,
+        actionMenu: 'main',
+        selectedRaiseTo: 0,
+        stagedBetAction: null,
+        lastActionLabel:
+          result.game.phase === 'showdown'
+            ? `${activePlayer.name} timed out and ${result.label.toLowerCase()}. Hand is ready for showdown.`
+            : `${activePlayer.name} timed out and ${result.label.toLowerCase()}.`,
+      }
+    }),
   setAutoplayOpponents: (enabled) =>
     set((state) => ({
       settings: { ...state.settings, autoplayOpponents: enabled },
@@ -103,3 +124,7 @@ export const useGameStore = create<GameStore>((set) => ({
       }
     }),
 }))
+
+export function turnKeyForGame(game: GameState, dealAnimationKey: number) {
+  return `${dealAnimationKey}-${game.activePlayerId}-${game.phase}-${game.communityCards.length}-${game.currentBet}`
+}

@@ -6,13 +6,11 @@ import { ActionButton3D } from './components/betting/ActionButton3D'
 import { CasinoRoom } from './components/table/CasinoRoom'
 import { TableModel } from './components/table/TableModel'
 import { CanvasLabel } from './components/vr/CanvasLabel'
-import { getLegalActions } from './game/rules/legalActions'
 import { buildPots } from './game/rules/pots'
 import { resolveShowdown } from './game/rules/showdown'
 import { chooseBotAction } from './game/rules/botStrategy'
 import { buildHandDebugSummary } from './game/rules/handDebug'
 import { formatChips } from './game/rules/formatChips'
-import { getRaiseOptions } from './game/rules/raiseOptions'
 import { useGameStore } from './game/state/useGameStore'
 import { TableScene } from './scenes/TableScene'
 import './App.css'
@@ -75,14 +73,11 @@ function App() {
           <span>{xrStatus}</span>
         </div>
         <div className="top-actions">
-          {view === 'table' ? (
-            <button className="secondary-entry" type="button" onClick={() => setView('lobby')}>
-              Lobby
+          {view === 'lobby' ? (
+            <button className="vr-entry" type="button" onClick={() => void enterVr()}>
+              Enter VR
             </button>
           ) : null}
-          <button className="vr-entry" type="button" onClick={() => void enterVr()}>
-            Enter VR
-          </button>
         </div>
       </div>
 
@@ -247,19 +242,10 @@ function SettingsPanel({
 function TableHud() {
   const game = useGameStore((state) => state.game)
   const lastActionLabel = useGameStore((state) => state.lastActionLabel)
-  const applyAction = useGameStore((state) => state.applyAction)
   const applyBotAction = useGameStore((state) => state.applyBotAction)
-  const startNextHand = useGameStore((state) => state.startNextHand)
   const autoplayOpponents = useGameStore((state) => state.settings.autoplayOpponents)
-  const actionMenu = useGameStore((state) => state.actionMenu)
-  const selectedRaiseTo = useGameStore((state) => state.selectedRaiseTo)
-  const stagedBetAction = useGameStore((state) => state.stagedBetAction)
-  const setActionMenu = useGameStore((state) => state.setActionMenu)
-  const setStagedBetAction = useGameStore((state) => state.setStagedBetAction)
-  const legalActions = useMemo(() => getLegalActions(game, game.activePlayerId), [game])
   const { pots, refunds } = useMemo(() => buildPots(game.players), [game.players])
   const showdown = useMemo(() => (game.phase === 'showdown' ? resolveShowdown(game) : null), [game])
-  const raiseOptions = useMemo(() => getRaiseOptions(game, game.activePlayerId), [game])
   const isHumanTurn = game.activePlayerId === 'p1'
 
   useEffect(() => {
@@ -294,154 +280,9 @@ function TableHud() {
       </div>
       <div className="hud-actions">
         {!isHumanTurn && game.phase !== 'showdown' ? <span className="bot-thinking">Opponent thinking...</span> : null}
-        {isHumanTurn ? (
-          <ActionMenuButtons
-            menu={actionMenu}
-            legalActions={legalActions}
-            raiseOptions={raiseOptions}
-            selectedRaiseTo={selectedRaiseTo}
-            stagedBetAction={stagedBetAction}
-            onAction={applyAction}
-            onMenu={setActionMenu}
-            onStagedBet={setStagedBetAction}
-          />
-        ) : null}
-        {game.phase === 'showdown' ? (
-          <button type="button" onClick={startNextHand}>
-            Next Hand
-          </button>
-        ) : null}
       </div>
     </section>
   )
-}
-
-function ActionMenuButtons({
-  menu,
-  legalActions,
-  raiseOptions,
-  selectedRaiseTo,
-  stagedBetAction,
-  onAction,
-  onMenu,
-  onStagedBet,
-}: {
-  menu: ReturnType<typeof useGameStore.getState>['actionMenu']
-  legalActions: ReturnType<typeof getLegalActions>
-  raiseOptions: ReturnType<typeof getRaiseOptions>
-  selectedRaiseTo: number
-  stagedBetAction: ReturnType<typeof useGameStore.getState>['stagedBetAction']
-  onAction: ReturnType<typeof useGameStore.getState>['applyAction']
-  onMenu: ReturnType<typeof useGameStore.getState>['setActionMenu']
-  onStagedBet: ReturnType<typeof useGameStore.getState>['setStagedBetAction']
-}) {
-  if (menu === 'raise-size' && raiseOptions) {
-    return (
-      <>
-        <span className="raise-stack-hint">{`Select chip stack | ${formatChips(selectedRaiseTo || raiseOptions.min)}`}</span>
-        <button className={hudButtonClass('Cancel')} type="button" onClick={() => onMenu('main')}>
-          Cancel
-        </button>
-      </>
-    )
-  }
-
-  if (menu === 'raise-intent') {
-    return (
-      <>
-        <button
-          className={hudButtonClass('Confirm')}
-          type="button"
-          onClick={() => onAction({ type: 'raise', amount: selectedRaiseTo, intent: 'confirm' })}
-        >
-          Confirm
-        </button>
-        <button
-          className={hudButtonClass('Stand')}
-          type="button"
-          onClick={() => onAction({ type: 'raise', amount: selectedRaiseTo, intent: 'stand' })}
-        >
-          Stand
-        </button>
-        <button className={hudButtonClass('Cancel')} type="button" onClick={() => onMenu('raise-size')}>
-          Cancel
-        </button>
-      </>
-    )
-  }
-
-  if (menu === 'bet-intent' && stagedBetAction) {
-    return (
-      <>
-        <button className={hudButtonClass('Confirm')} type="button" onClick={() => onAction(stagedActionWithIntent(stagedBetAction, 'confirm'))}>
-          Confirm
-        </button>
-        <button className={hudButtonClass('Stand')} type="button" onClick={() => onAction(stagedActionWithIntent(stagedBetAction, 'stand'))}>
-          Stand
-        </button>
-        <button
-          className={hudButtonClass('Cancel')}
-          type="button"
-          onClick={() => {
-            onStagedBet(null)
-            onMenu('main')
-          }}
-        >
-          Cancel
-        </button>
-      </>
-    )
-  }
-
-  return (
-    <>
-      {legalActions.map((action) =>
-        action.type === 'raise' ? (
-          <button key={action.type} className={hudButtonClass('Raise')} type="button" onClick={() => onMenu('raise-size')}>
-            Raise
-          </button>
-        ) : (
-          <button
-            key={action.type}
-            className={hudButtonClass(action.label)}
-            type="button"
-            onClick={() => onAction({ type: action.type })}
-          >
-            {action.label}
-          </button>
-        ),
-      )}
-    </>
-  )
-}
-
-function stagedActionWithIntent(
-  action: NonNullable<ReturnType<typeof useGameStore.getState>['stagedBetAction']>,
-  intent: 'confirm' | 'stand',
-) {
-  if (action.type === 'call') {
-    return { type: 'call' as const, intent }
-  }
-
-  if (action.type === 'raise') {
-    return { ...action, intent }
-  }
-
-  return action
-}
-
-function hudButtonClass(label: string) {
-  const action = label.toLowerCase()
-
-  if (action.includes('raise') || action.startsWith('min') || action.startsWith('half') || action.startsWith('pot')) {
-    return 'hud-button hud-button-raise'
-  }
-
-  if (action.includes('stand')) {
-    return 'hud-button hud-button-stand'
-  }
-
-  return 'hud-button hud-button-secondary'
 }
 
 function formatAward(winnerIds: string[], amount: number, game: ReturnType<typeof useGameStore.getState>['game']) {

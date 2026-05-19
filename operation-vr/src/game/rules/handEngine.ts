@@ -78,6 +78,18 @@ export function applyPlayerAction(game: GameState, playerId: string, action: Pla
   }
 }
 
+export function applyTimeoutFold(game: GameState, playerId: string): ActionResult {
+  let nextGame = updatePlayer(game, playerId, (player) => ({ ...player, state: 'folded' }))
+  nextGame = markPlayerActed(nextGame, playerId)
+  nextGame = markBusts(nextGame)
+  nextGame = advanceTurn(nextGame)
+
+  return {
+    game: nextGame,
+    label: 'Fold',
+  }
+}
+
 function markPlayerActed(game: GameState, playerId: string): GameState {
   return {
     ...game,

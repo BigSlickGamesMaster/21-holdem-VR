@@ -5,6 +5,7 @@ import type { Group } from 'three'
 import { chipPiecesForAmount, chipValueForPieces } from '../../game/rules/chipInventory'
 import { formatChips } from '../../game/rules/formatChips'
 import type { RaiseOptions } from '../../game/rules/raiseOptions'
+import { Chip } from '../chips/ChipStack'
 import { CanvasLabel } from '../vr/CanvasLabel'
 
 export type BetChipSelection =
@@ -26,10 +27,7 @@ const chipSpacing = 0.014
 
 export function RaiseChipSelector({ options, callAmount, callAllIn = false, position, onPreview, onSelect }: RaiseChipSelectorProps) {
   const [tier, setTier] = useState<RaiseTier>(callAmount ? 'call' : 'min')
-  const [resolvingSelection, setResolvingSelection] = useState<BetChipSelection | null>(null)
   const startTimeRef = useRef<number | null>(null)
-  const resolveStartRef = useRef<number | null>(null)
-  const resolveFiredRef = useRef(false)
   const chipRefs = useRef<Array<Group | null>>([])
   const stackAmount = Math.max(options.pot, options.halfPot, options.min, callAmount ?? 0)
   const stackChips = chipPiecesForAmount(stackAmount)
@@ -44,9 +42,6 @@ export function RaiseChipSelector({ options, callAmount, callAllIn = false, posi
 
   function previewFromPointer(event: ThreeEvent<PointerEvent>) {
     event.stopPropagation()
-    if (resolvingSelection) {
-      return
-    }
 
     const nextTier = tierFromWorldY(event.point.y, position[1], hitHeight, Boolean(callAmount))
     setTier(nextTier)
@@ -55,13 +50,7 @@ export function RaiseChipSelector({ options, callAmount, callAllIn = false, posi
 
   function selectCurrent(event: ThreeEvent<MouseEvent>) {
     event.stopPropagation()
-    if (resolvingSelection) {
-      return
-    }
-
-    resolveStartRef.current = null
-    resolveFiredRef.current = false
-    setResolvingSelection(selection)
+    onSelect(selection)
   }
 
   useFrame((state) => {
@@ -76,45 +65,20 @@ export function RaiseChipSelector({ options, callAmount, callAllIn = false, posi
       const delay = index * 0.045
       const progress = Math.max(0, Math.min(1, (elapsed - delay) / 0.52))
       const eased = 1 - Math.pow(1 - progress, 3)
-      const highlighted = index >= stackChips.length - litChips
-      const currentPop = typeof chip.userData.selectionPop === 'number' ? chip.userData.selectionPop : 0
-      const targetPop = highlighted ? 1 : 0
-      const selectionPop = currentPop + (targetPop - currentPop) * 0.24
       const sourceX = -0.2
       const sourceY = -0.035
       const sourceZ = 0.34
       const baseX = Math.sin(index * 0.82) * 0.008
       const baseZ = Math.cos(index * 0.72) * 0.008
-      const finalX = baseX + selectionPop * 0.042
-      const finalZ = baseZ - selectionPop * 0.018
-      const targetY = index * chipSpacing + selectionPop * 0.068
-      chip.userData.selectionPop = selectionPop
-
-      if (resolvingSelection) {
-        resolveStartRef.current ??= state.clock.elapsedTime
-        const resolveProgress = Math.min((state.clock.elapsedTime - resolveStartRef.current) / 0.72, 1)
-        const resolveEase = 1 - Math.pow(1 - resolveProgress, 3)
-        const selectedChip = highlighted
-        const destinationX = selectedChip ? -0.5 : -0.76
-        const destinationZ = selectedChip ? -0.38 : 0.2
-        const destinationY = selectedChip ? 0.026 + (index % 4) * 0.01 : 0.018 + index * 0.006
-
-        chip.position.x = finalX * (1 - resolveEase) + destinationX * resolveEase
-        chip.position.y = targetY * (1 - resolveEase) + destinationY * resolveEase + Math.sin(resolveProgress * Math.PI) * 0.12
-        chip.position.z = finalZ * (1 - resolveEase) + destinationZ * resolveEase
-        chip.rotation.y = Math.PI * 2 + resolveProgress * Math.PI * 1.4
-
-        if (resolveProgress >= 1 && !resolveFiredRef.current) {
-          resolveFiredRef.current = true
-          onSelect(resolvingSelection)
-        }
-        return
-      }
+      const finalX = baseX
+      const finalZ = baseZ
+      const targetY = index * chipSpacing
 
       chip.position.x = sourceX * (1 - eased) + finalX * eased + Math.sin((progress + index * 0.07) * Math.PI) * 0.038 * (1 - eased)
       chip.position.y = sourceY * (1 - eased) + targetY * eased + Math.sin(progress * Math.PI) * 0.08
       chip.position.z = sourceZ * (1 - eased) + finalZ * eased + Math.cos((progress + index * 0.11) * Math.PI) * 0.026 * (1 - eased)
       chip.rotation.y = progress < 1 ? progress * Math.PI * 2 : Math.PI * 2
+      chip.scale.setScalar(1)
     })
   })
 
@@ -122,10 +86,10 @@ export function RaiseChipSelector({ options, callAmount, callAllIn = false, posi
     <group position={position}>
       <CanvasLabel
         text={selection.label}
-        position={[0, 0.008, 0.17]}
-        width={0.36}
-        height={0.075}
-        fontSize={64}
+        position={[0, 0.012, 0.19]}
+        width={0.48}
+        height={0.105}
+        fontSize={88}
         background="rgba(0, 0, 0, 0)"
         color={selectionAllIn ? '#ffec8a' : '#f7f9ff'}
       />
@@ -142,15 +106,15 @@ export function RaiseChipSelector({ options, callAmount, callAllIn = false, posi
         const highlighted = index >= stackChips.length - litChips
         return (
           <group key={index} ref={(node) => { chipRefs.current[index] = node }}>
-            <mesh castShadow receiveShadow>
-              <cylinderGeometry args={[0.07, 0.07, 0.011, 36]} />
-              <meshStandardMaterial
-                color={highlighted ? chipColor(tier) : chip.color}
-                emissive={highlighted ? chipGlow(tier) : '#000000'}
-                emissiveIntensity={highlighted ? 0.72 : 0}
-                roughness={0.42}
-              />
-            </mesh>
+            <Chip
+              position={[0, 0, 0]}
+              color={highlighted ? chipColor(tier) : chip.color}
+              value={chip.value}
+              radius={0.07}
+              height={0.011}
+              emissive={highlighted ? chipGlow(tier) : '#000000'}
+              emissiveIntensity={highlighted ? 0.72 : 0}
+            />
           </group>
         )
       })}
