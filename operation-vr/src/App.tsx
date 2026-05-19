@@ -1,6 +1,11 @@
 import { Canvas } from '@react-three/fiber'
+import { OrbitControls } from '@react-three/drei'
 import { XR, XROrigin, createXRStore } from '@react-three/xr'
 import { useEffect, useMemo, useState } from 'react'
+import { ActionButton3D } from './components/betting/ActionButton3D'
+import { CasinoRoom } from './components/table/CasinoRoom'
+import { TableModel } from './components/table/TableModel'
+import { CanvasLabel } from './components/vr/CanvasLabel'
 import { getLegalActions } from './game/rules/legalActions'
 import { buildPots } from './game/rules/pots'
 import { resolveShowdown } from './game/rules/showdown'
@@ -81,21 +86,51 @@ function App() {
         </div>
       </div>
 
-      {view === 'lobby' ? (
-        <Lobby onStart={() => setView('table')} />
-      ) : (
-        <>
-          <Canvas camera={{ position: [0, 2.25, 3.2], fov: 52 }} shadows>
-            <XR store={xrStore}>
-              <XROrigin position={[0, 0, 1.65]} />
-              <TableScene />
-            </XR>
-          </Canvas>
-          <TableHud />
-          <DebugPanel />
-        </>
-      )}
+      <Canvas camera={{ position: [0, 2.25, 3.2], fov: 52 }} shadows>
+        <XR store={xrStore}>
+          <XROrigin position={[0, 0, 1.65]} />
+          {view === 'lobby' ? <VrLobbyScene onStart={() => setView('table')} /> : <TableScene />}
+        </XR>
+      </Canvas>
+      {view === 'lobby' ? <Lobby onStart={() => setView('table')} /> : <TableHud />}
+      {view === 'table' ? <DebugPanel /> : null}
     </main>
+  )
+}
+
+function VrLobbyScene({ onStart }: { onStart: () => void }) {
+  return (
+    <>
+      <color attach="background" args={['#101216']} />
+      <ambientLight intensity={0.65} />
+      <directionalLight position={[3, 7, 4]} intensity={1.4} castShadow />
+      <OrbitControls target={[0, 0.95, 0]} enablePan={false} maxPolarAngle={Math.PI * 0.5} />
+      <CasinoRoom />
+      <group position={[0, -0.06, -0.36]} scale={0.82}>
+        <TableModel />
+      </group>
+      <CanvasLabel
+        text="21 HOLD'EM VR"
+        position={[0, 1.56, 0.62]}
+        rotation={[0, 0, 0]}
+        width={1.55}
+        height={0.22}
+        fontSize={106}
+        background="rgba(0, 0, 0, 0)"
+        color="#f7f9ff"
+      />
+      <CanvasLabel
+        text="BB 1 / SB 0.5"
+        position={[0, 1.28, 0.62]}
+        rotation={[0, 0, 0]}
+        width={0.92}
+        height={0.12}
+        fontSize={72}
+        background="rgba(0, 0, 0, 0)"
+        color="#ffdc8b"
+      />
+      <ActionButton3D label="Start Table" position={[0, 0.98, 0.72]} onPress={onStart} />
+    </>
   )
 }
 

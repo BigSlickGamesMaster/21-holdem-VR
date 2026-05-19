@@ -203,20 +203,54 @@ function RacetrackRingLayer({
 export function TableModel() {
   return (
     <group>
-      <RoundedLayer width={2.52} depth={1.1} height={0.34} y={0.18} radius={0.2} color="#6f2d0e" roughness={0.5} />
+      <RoundedLayer
+        width={2.52}
+        depth={1.1}
+        height={0.34}
+        y={0.18}
+        radius={0.2}
+        color="#5f260d"
+        roughness={0.42}
+        metalness={0.08}
+        emissive="#2b1106"
+        emissiveIntensity={0.06}
+      />
       <RoundedLayer
         width={2.62}
         depth={1.18}
         height={0.055}
         y={0.49}
         radius={0.22}
-        color="#c17424"
-        roughness={0.32}
-        metalness={0.2}
-        emissive="#5b240b"
-        emissiveIntensity={0.08}
+        color="#d39034"
+        roughness={0.24}
+        metalness={0.42}
+        emissive="#6d2b0c"
+        emissiveIntensity={0.12}
       />
-      <RacetrackLayer width={3.5} depth={1.92} height={0.3} y={0.42} color="#7f3512" roughness={0.44} />
+      <RacetrackLayer
+        width={3.5}
+        depth={1.92}
+        height={0.3}
+        y={0.42}
+        color="#6e2b0d"
+        roughness={0.36}
+        metalness={0.08}
+        emissive="#2c1005"
+        emissiveIntensity={0.05}
+      />
+      <RacetrackRingLayer
+        outerWidth={3.58}
+        outerDepth={2.08}
+        innerWidth={3.44}
+        innerDepth={1.94}
+        height={0.045}
+        y={0.69}
+        color="#f0c16d"
+        roughness={0.18}
+        metalness={0.62}
+        emissive="#c37120"
+        emissiveIntensity={0.2}
+      />
       <RacetrackRingLayer
         outerWidth={3.5}
         outerDepth={2}
@@ -224,11 +258,24 @@ export function TableModel() {
         innerDepth={1.78}
         height={0.16}
         y={0.72}
-        color="#d89132"
-        roughness={0.26}
-        metalness={0.35}
-        emissive="#6f2f0f"
-        emissiveIntensity={0.12}
+        color="#c77a24"
+        roughness={0.2}
+        metalness={0.48}
+        emissive="#73300e"
+        emissiveIntensity={0.14}
+      />
+      <RacetrackRingLayer
+        outerWidth={3.28}
+        outerDepth={1.78}
+        innerWidth={3.2}
+        innerDepth={1.7}
+        height={0.028}
+        y={0.81}
+        color="#4c63ff"
+        roughness={0.18}
+        metalness={0.1}
+        emissive="#233bff"
+        emissiveIntensity={0.85}
       />
       <RacetrackLayer
         width={3.24}
@@ -240,6 +287,33 @@ export function TableModel() {
         emissive="#263f66"
         emissiveIntensity={0.08}
       />
+      <RailStuds />
+    </group>
+  )
+}
+
+function RailStuds() {
+  const positions: Array<[number, number, number]> = [
+    [-1.36, 0.84, 0.82],
+    [-0.72, 0.84, 0.92],
+    [0, 0.84, 0.96],
+    [0.72, 0.84, 0.92],
+    [1.36, 0.84, 0.82],
+    [-1.36, 0.84, -0.82],
+    [-0.72, 0.84, -0.92],
+    [0, 0.84, -0.96],
+    [0.72, 0.84, -0.92],
+    [1.36, 0.84, -0.82],
+  ]
+
+  return (
+    <group>
+      {positions.map((position, index) => (
+        <mesh key={`rail-stud-${index}`} position={position} castShadow receiveShadow>
+          <sphereGeometry args={[0.035, 18, 12]} />
+          <meshStandardMaterial color="#f2c978" roughness={0.18} metalness={0.72} emissive="#8a4c15" emissiveIntensity={0.12} />
+        </mesh>
+      ))}
     </group>
   )
 }

@@ -7,6 +7,12 @@
   grid-template-rows: auto 1fr;
 }
 
+.app-shell > canvas {
+  grid-row: 2;
+  width: 100% !important;
+  height: calc(100svh - 64px) !important;
+}
+
 .top-bar {
   min-height: 64px;
   padding: 12px 18px;
@@ -65,14 +71,18 @@
 }
 
 .lobby-screen {
-  min-height: calc(100svh - 64px);
-  padding: 32px;
+  position: fixed;
+  left: 24px;
+  top: 88px;
+  width: min(420px, calc(100vw - 48px));
+  padding: 18px;
   display: grid;
   align-content: center;
   gap: 18px;
-  background:
-    radial-gradient(circle at center, rgba(36, 90, 69, 0.18), transparent 38%),
-    linear-gradient(180deg, #101216 0%, #171a20 100%);
+  background: rgba(11, 17, 29, 0.72);
+  border: 1px solid rgba(137, 158, 205, 0.42);
+  border-radius: 18px;
+  backdrop-filter: blur(12px);
 }
 
 .lobby-panel {
@@ -84,7 +94,7 @@
 
 .lobby-panel h1 {
   margin: 0 0 10px;
-  font-size: 42px;
+  font-size: 30px;
   line-height: 1.05;
 }
 
@@ -96,7 +106,7 @@
 
 .lobby-actions {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: 1fr;
   gap: 10px;
 }
 

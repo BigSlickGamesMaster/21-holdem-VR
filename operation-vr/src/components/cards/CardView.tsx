@@ -67,25 +67,55 @@ function drawCardFace(context: CanvasRenderingContext2D, width: number, height: 
 }
 
 function drawCardBack(context: CanvasRenderingContext2D, width: number, height: number) {
-  context.fillStyle = '#1f3d68'
+  const gradient = context.createLinearGradient(0, 0, width, height)
+  gradient.addColorStop(0, '#031126')
+  gradient.addColorStop(0.45, '#0d315f')
+  gradient.addColorStop(1, '#020916')
+  context.fillStyle = gradient
   roundedRect(context, 0, 0, width, height, 34)
   context.fill()
-  context.strokeStyle = '#8fb4ff'
-  context.lineWidth = 12
+  context.strokeStyle = '#f7f9ff'
+  context.lineWidth = 14
   context.stroke()
 
-  context.fillStyle = '#162a4a'
-  roundedRect(context, 46, 46, width - 92, height - 92, 22)
+  context.strokeStyle = '#5eb7ff'
+  context.lineWidth = 6
+  roundedRect(context, 18, 18, width - 36, height - 36, 30)
+  context.stroke()
+
+  context.strokeStyle = 'rgba(255,255,255,0.75)'
+  context.lineWidth = 4
+  roundedRect(context, 36, 36, width - 72, height - 72, 22)
+  context.stroke()
+
+  context.fillStyle = 'rgba(255,255,255,0.1)'
+  context.beginPath()
+  context.ellipse(width * 0.68, height * 0.18, width * 0.42, height * 0.18, -0.22, 0, Math.PI * 2)
   context.fill()
-  context.strokeStyle = '#2d6ef1'
-  context.lineWidth = 7
-  context.stroke()
 
-  context.fillStyle = '#f7f9ff'
+  context.shadowColor = '#4eb7ff'
+  context.shadowBlur = 22
+  context.fillStyle = '#f9fbff'
   context.textAlign = 'center'
   context.textBaseline = 'middle'
-  context.font = '800 92px Arial, Helvetica, sans-serif'
-  context.fillText('BSG', width / 2, height / 2)
+  context.font = '900 245px Arial, Helvetica, sans-serif'
+  context.fillText('21', width / 2, height * 0.43)
+  context.font = '900 72px Arial, Helvetica, sans-serif'
+  context.fillText("HOLD'EM", width / 2, height * 0.66)
+  context.shadowBlur = 0
+
+  context.strokeStyle = '#d7eaff'
+  context.lineWidth = 4
+  context.strokeText("HOLD'EM", width / 2, height * 0.66)
+
+  context.save()
+  context.translate(width * 0.78, height * 0.61)
+  context.rotate(Math.PI / 4)
+  context.fillStyle = '#f9fbff'
+  context.fillRect(-14, -14, 28, 28)
+  context.fillStyle = '#061833'
+  context.fillRect(-7, -7, 14, 14)
+  context.restore()
 }
 
 function roundedRect(context: CanvasRenderingContext2D, x: number, y: number, width: number, height: number, radius: number) {

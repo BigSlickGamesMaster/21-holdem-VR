@@ -7,6 +7,7 @@ import { RaiseChipSelector, type BetChipSelection } from '../components/betting/
 import { TableConsole } from '../components/betting/TableConsole'
 import { DealtCard } from '../components/cards/DealtCard'
 import { ChipStack } from '../components/chips/ChipStack'
+import { CasinoRoom } from '../components/table/CasinoRoom'
 import { TableModel } from '../components/table/TableModel'
 import { CanvasLabel } from '../components/vr/CanvasLabel'
 import { formatChips } from '../game/rules/formatChips'
@@ -165,11 +166,7 @@ export function TableScene() {
       <directionalLight position={[3, 7, 4]} intensity={1.8} castShadow />
       <OrbitControls target={[0, 0.76, 0]} enablePan={false} maxPolarAngle={Math.PI * 0.48} />
 
-      <mesh receiveShadow rotation={[-Math.PI / 2, 0, 0]}>
-        <planeGeometry args={[8, 8]} />
-        <meshStandardMaterial color="#2a2d31" roughness={0.9} />
-      </mesh>
-
+      <CasinoRoom />
       <TableModel />
       <TableSurfaceMarks
         players={game.players}
