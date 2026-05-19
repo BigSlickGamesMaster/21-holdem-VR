@@ -99,6 +99,36 @@ export function TableScene() {
     null,
   )
   const activeFoldThrow = foldThrow?.dealKey === dealAnimationKey ? foldThrow : null
+  const [showdownTimer, setShowdownTimer] = useState<{ dealKey: number; startedAt: number } | null>(null)
+  const [countdownNow, setCountdownNow] = useState(() => window.performance.now())
+  const activeShowdownTimer = showdownTimer?.dealKey === dealAnimationKey ? showdownTimer : null
+  const nextHandCountdown =
+    game.phase === 'showdown' && activeShowdownTimer
+      ? Math.max(0, 6 - Math.floor((countdownNow - activeShowdownTimer.startedAt) / 1000))
+      : 6
+  const nextHandLabel = showdown ? `Next ${nextHandCountdown}` : null
+
+  useEffect(() => {
+    if (game.phase !== 'showdown') {
+      return
+    }
+
+    const startedAt = window.performance.now()
+    const setup = window.setTimeout(() => {
+      setShowdownTimer({ dealKey: dealAnimationKey, startedAt })
+      setCountdownNow(startedAt)
+    }, 0)
+    const interval = window.setInterval(() => {
+      setCountdownNow(window.performance.now())
+    }, 250)
+    const timeout = window.setTimeout(() => startNextHand(), 6000)
+
+    return () => {
+      window.clearTimeout(setup)
+      window.clearInterval(interval)
+      window.clearTimeout(timeout)
+    }
+  }, [dealAnimationKey, game.phase, startNextHand])
 
   function throwCardToFold() {
     const human = game.players.find((player) => player.id === 'p1')
@@ -145,7 +175,7 @@ export function TableScene() {
         players={game.players}
         checkActive={canTapCheck}
         confirmActive={actionMenu === 'bet-intent' && stagedBetAction !== null}
-        nextHandActive={Boolean(showdown)}
+        nextHandLabel={nextHandLabel}
       />
       <PlayerHandTotal game={game} />
 
@@ -214,7 +244,7 @@ export function TableScene() {
             position={[consoleX, controlY, consoleZ]}
             width={consoleSize}
             depth={consoleSize}
-            prompt="Next Hand"
+            prompt={nextHandLabel ?? 'Next Hand'}
             onPrompt={startNextHand}
           />
         </>
@@ -272,89 +302,35 @@ function ShowdownSeatResults({
   game: ReturnType<typeof useGameStore.getState>['game']
   showdown: NonNullable<ReturnType<typeof resolveShowdown>>
 }) {
-  const winningIds = new Set(showdown.awards.flatMap((award) => award.winnerIds))
-
   return (
     <group>
       {game.players.map((player) => {
         const position = seatPositions[player.seat]
-        const resultPosition = resultLabelPosition(player.seat, position)
         const total = showdown.totals[player.id]
-        const payout = showdown.payouts[player.id] ?? 0
-        const result = showdownResultText({
-          payout,
-          total: total?.total ?? 0,
-          bust: total?.bust ?? false,
-          wonPot: winningIds.has(player.id),
-        })
 
         return (
-          <group key={`showdown-result-${player.id}`}>
-            <CanvasLabel
-              text={result}
-              position={resultPosition}
-              rotation={[-Math.PI / 2, 0, cardYawForSeat(player.seat)]}
-              width={0.3}
-              height={0.08}
-              fontSize={68}
-              background="rgba(0, 0, 0, 0)"
-              color={result.startsWith('WIN') || result.startsWith('PUSH') ? '#5bf08d' : '#ffb4a8'}
-            />
-            <CanvasLabel
-              text={total?.bust ? `${total.total} BUST` : String(total?.total ?? '')}
-              position={totalLabelPosition(player.seat, position)}
-              rotation={[-Math.PI / 2, 0, cardYawForSeat(player.seat)]}
-              width={0.22}
-              height={0.065}
-              fontSize={60}
-              background="rgba(0, 0, 0, 0)"
-              color={total?.bust ? '#ff7474' : '#f7f9ff'}
-            />
-          </group>
+          <CanvasLabel
+            key={`showdown-total-${player.id}`}
+            text={total?.bust ? `${total.total} BUST` : String(total?.total ?? '')}
+            position={showdownTotalPosition(player.seat, position)}
+            rotation={[-Math.PI / 2, 0, cardYawForSeat(player.seat)]}
+            width={0.46}
+            height={0.16}
+            fontSize={140}
+            background="rgba(0, 0, 0, 0)"
+            color={total?.bust ? '#ff7474' : '#f7f9ff'}
+          />
         )
       })}
     </group>
   )
 }
 
-function showdownResultText({
-  payout,
-  total,
-  bust,
-  wonPot,
-}: {
-  payout: number
-  total: number
-  bust: boolean
-  wonPot: boolean
-}) {
-  if (bust) {
-    return 'BUST'
-  }
-
-  if (wonPot) {
-    return `WIN +${formatChips(payout)}`
-  }
-
-  if (payout > 0) {
-    return `PUSH +${formatChips(payout)}`
-  }
-
-  return `LOSE ${total}`
-}
-
-function resultLabelPosition(seat: number, seatPosition: [number, number, number]): [number, number, number] {
+function showdownTotalPosition(seat: number, seatPosition: [number, number, number]): [number, number, number] {
   const cardBase = playerCardBase(seat, seatPosition, objectY)
   const { inward } = seatFrameForSeat(seat, seatPosition)
 
-  return [cardBase[0] + inward[0] * 0.27, objectY + 0.006, cardBase[2] + inward[1] * 0.27]
-}
-
-function totalLabelPosition(seat: number, seatPosition: [number, number, number]): [number, number, number] {
-  const cardBase = playerCardBase(seat, seatPosition, objectY)
-  const { left } = seatFrameForSeat(seat, seatPosition)
-
-  return [cardBase[0] - left[0] * 0.16, objectY + 0.006, cardBase[2] - left[1] * 0.16]
+  return [cardBase[0] + inward[0] * 0.18, objectY + 0.006, cardBase[2] + inward[1] * 0.18]
 }
 
 function AllInMarker({ seat, seatPosition }: { seat: number; seatPosition: [number, number, number] }) {
@@ -481,15 +457,16 @@ function TableSurfaceMarks({
   players,
   checkActive,
   confirmActive,
-  nextHandActive,
+  nextHandLabel,
 }: {
   players: ReturnType<typeof useGameStore.getState>['game']['players']
   checkActive: boolean
   confirmActive: boolean
-  nextHandActive: boolean
+  nextHandLabel: string | null
 }) {
   const markY = objectY - 0.008
-  const consoleText = nextHandActive ? 'Next Hand' : confirmActive ? 'Confirm' : checkActive ? 'Check' : null
+  const nextHandActive = nextHandLabel !== null
+  const consoleText = nextHandLabel ?? (confirmActive ? 'Confirm' : checkActive ? 'Check' : null)
   const consoleColor = nextHandActive ? '#050608' : confirmActive ? '#5bf08d' : '#8fffc1'
   const consoleTextColor = nextHandActive ? '#f4f1e8' : confirmActive ? '#d9ffe5' : '#bfffd5'
   const consoleOpacity = nextHandActive ? 0.72 : confirmActive ? 0.6 : 0.28
@@ -555,6 +532,10 @@ function TableSurfaceMarks({
 }
 
 function PlayerHandTotal({ game }: { game: ReturnType<typeof useGameStore.getState>['game'] }) {
+  if (game.phase === 'showdown') {
+    return null
+  }
+
   const player = game.players.find((candidate) => candidate.id === 'p1')
   if (!player) {
     return null

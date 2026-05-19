@@ -120,6 +120,15 @@ export function RaiseChipSelector({ options, callAmount, callAllIn = false, posi
 
   return (
     <group position={position}>
+      <CanvasLabel
+        text={selection.label}
+        position={[0, 0.008, 0.17]}
+        width={0.36}
+        height={0.075}
+        fontSize={64}
+        background="rgba(0, 0, 0, 0)"
+        color={selectionAllIn ? '#ffec8a' : '#f7f9ff'}
+      />
       <mesh
         position={[0, hitHeight / 2 - 0.012, 0]}
         onClick={selectCurrent}
@@ -181,18 +190,18 @@ function tierFromWorldY(worldY: number, baseY: number, hitHeight: number, hasCal
 
 function selectionForTier(options: RaiseOptions, tier: RaiseTier, callAmount: number | undefined): BetChipSelection {
   if (tier === 'call' && callAmount !== undefined) {
-    return { type: 'call', amount: callAmount, label: `Call ${formatChips(callAmount)}` }
+    return { type: 'call', amount: callAmount, label: `Call ${formatChips(callAmount)} chips` }
   }
 
   if (tier === 'pot') {
-    return { type: 'raise', amount: options.pot, label: `Pot ${formatChips(options.pot)}` }
+    return { type: 'raise', amount: options.pot, label: `Pot ${formatChips(options.pot)} chips` }
   }
 
   if (tier === 'halfPot') {
-    return { type: 'raise', amount: options.halfPot, label: `Half ${formatChips(options.halfPot)}` }
+    return { type: 'raise', amount: options.halfPot, label: `1/2 ${formatChips(options.halfPot)} chips` }
   }
 
-  return { type: 'raise', amount: options.min, label: `Min ${formatChips(options.min)}` }
+  return { type: 'raise', amount: options.min, label: `Min ${formatChips(options.min)} chips` }
 }
 
 function litChipsForAmount(stackChips: ReturnType<typeof chipPiecesForAmount>, amount: number) {
