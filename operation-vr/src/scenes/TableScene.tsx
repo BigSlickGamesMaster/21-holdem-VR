@@ -144,6 +144,7 @@ export function TableScene() {
         players={game.players}
         checkActive={canTapCheck}
         confirmActive={actionMenu === 'bet-intent' && stagedBetAction !== null}
+        nextHandActive={Boolean(showdown)}
       />
       <PlayerHandTotal game={game} />
 
@@ -206,14 +207,6 @@ export function TableScene() {
 
       {showdown ? (
         <>
-          <CanvasLabel
-            text={showdownSummary(showdown, game)}
-            position={potPosition}
-            width={1.28}
-            height={0.13}
-            fontSize={36}
-            background="#151d2b"
-          />
           {Object.entries(showdown.payouts).map(([playerId, amount]) => {
             const player = game.players.find((candidate) => candidate.id === playerId)
             if (!player || amount <= 0) {
@@ -234,7 +227,13 @@ export function TableScene() {
               />
             )
           })}
-          <ActionButton3D label="Next Hand" position={[0, controlY, 0.72]} onPress={startNextHand} />
+          <TableConsole
+            position={[consoleX, controlY, consoleZ]}
+            width={consoleSize}
+            depth={consoleSize}
+            prompt="Next Hand"
+            onPrompt={startNextHand}
+          />
         </>
       ) : null}
 
@@ -407,13 +406,18 @@ function TableSurfaceMarks({
   players,
   checkActive,
   confirmActive,
+  nextHandActive,
 }: {
   players: ReturnType<typeof useGameStore.getState>['game']['players']
   checkActive: boolean
   confirmActive: boolean
+  nextHandActive: boolean
 }) {
   const markY = objectY - 0.008
-  const consoleText = confirmActive ? 'Confirm' : checkActive ? 'Check' : null
+  const consoleText = nextHandActive ? 'Next Hand' : confirmActive ? 'Confirm' : checkActive ? 'Check' : null
+  const consoleColor = nextHandActive ? '#050608' : confirmActive ? '#5bf08d' : '#8fffc1'
+  const consoleTextColor = nextHandActive ? '#f4f1e8' : confirmActive ? '#d9ffe5' : '#bfffd5'
+  const consoleOpacity = nextHandActive ? 0.72 : confirmActive ? 0.6 : 0.28
 
   return (
     <group>
@@ -442,15 +446,21 @@ function TableSurfaceMarks({
           opacity={0.22}
         />
       ))}
-      {confirmActive ? (
-        <SurfaceFill position={[consoleX, markY - 0.001, consoleZ]} width={consoleSize} depth={consoleSize} color="#5bf08d" opacity={0.18} />
+      {confirmActive || nextHandActive ? (
+        <SurfaceFill
+          position={[consoleX, markY - 0.001, consoleZ]}
+          width={consoleSize}
+          depth={consoleSize}
+          color={nextHandActive ? '#050608' : '#5bf08d'}
+          opacity={nextHandActive ? 0.5 : 0.18}
+        />
       ) : null}
       <SurfaceSlot
         position={[consoleX, markY, consoleZ]}
         width={consoleSize}
         depth={consoleSize}
-        color={confirmActive ? '#5bf08d' : '#8fffc1'}
-        opacity={confirmActive ? 0.6 : 0.28}
+        color={consoleColor}
+        opacity={consoleOpacity}
       />
       {consoleText ? (
         <CanvasLabel
@@ -458,9 +468,9 @@ function TableSurfaceMarks({
           position={[consoleX, markY + 0.004, consoleZ]}
           width={consoleSize * 0.82}
           height={consoleSize * 0.28}
-          fontSize={104}
+          fontSize={nextHandActive ? 72 : 104}
           background="rgba(0, 0, 0, 0)"
-          color={confirmActive ? '#d9ffe5' : '#bfffd5'}
+          color={consoleTextColor}
         />
       ) : null}
     </group>
@@ -610,24 +620,6 @@ function applyStagedBet(
   if (action.type === 'raise') {
     applyAction({ ...action, intent })
   }
-}
-
-function showdownSummary(
-  showdown: NonNullable<ReturnType<typeof resolveShowdown>>,
-  game: ReturnType<typeof useGameStore.getState>['game'],
-) {
-  const awards = showdown.awards.filter((award) => award.amount > 0)
-
-  if (awards.length === 0) {
-    return 'Showdown | No resolved awards'
-  }
-
-  return awards
-    .map((award) => {
-      const names = award.winnerIds.map((id) => game.players.find((player) => player.id === id)?.name ?? id).join(' + ')
-      return `${names} win ${formatChips(award.amount)}`
-    })
-    .join(' | ')
 }
 
 function holeCardTarget(seat: number, position: [number, number, number], cardIndex: number, y = objectY): [number, number, number] {

@@ -27,7 +27,7 @@ export function CanvasLabel({
   return (
     <mesh position={position} rotation={rotation}>
       <planeGeometry args={[width, height]} />
-      <meshBasicMaterial map={texture} transparent />
+      <meshBasicMaterial map={texture} transparent depthWrite={false} />
     </mesh>
   )
 }
