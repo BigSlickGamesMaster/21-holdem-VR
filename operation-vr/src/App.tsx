@@ -1,0 +1,439 @@
+import { Canvas } from '@react-three/fiber'
+import { XR, XROrigin, createXRStore } from '@react-three/xr'
+import { useEffect, useMemo, useState } from 'react'
+import { getLegalActions } from './game/rules/legalActions'
+import { buildPots } from './game/rules/pots'
+import { resolveShowdown } from './game/rules/showdown'
+import { chooseBotAction } from './game/rules/botStrategy'
+import { buildHandDebugSummary } from './game/rules/handDebug'
+import { formatChips } from './game/rules/formatChips'
+import { getRaiseOptions } from './game/rules/raiseOptions'
+import { useGameStore } from './game/state/useGameStore'
+import { TableScene } from './scenes/TableScene'
+import './App.css'
+
+const xrStore = createXRStore({
+  controller: true,
+  hand: false,
+  gaze: false,
+  transientPointer: true,
+})
+
+function App() {
+  const [xrStatus, setXrStatus] = useState('Checking WebXR support...')
+  const [view, setView] = useState<'lobby' | 'table'>('lobby')
+
+  useEffect(() => {
+    let active = true
+
+    async function checkWebXr() {
+      if (!window.isSecureContext) {
+        setXrStatus('VR blocked: open this page over HTTPS on the headset.')
+        return
+      }
+
+      if (!navigator.xr) {
+        setXrStatus('VR blocked: this browser is not exposing WebXR.')
+        return
+      }
+
+      const supported = await navigator.xr.isSessionSupported('immersive-vr')
+      if (active) {
+        setXrStatus(supported ? 'VR ready: press Enter VR in the headset.' : 'VR blocked: immersive-vr is unavailable.')
+      }
+    }
+
+    void checkWebXr().catch((error: unknown) => {
+      if (active) {
+        setXrStatus(error instanceof Error ? error.message : 'VR support check failed.')
+      }
+    })
+
+    return () => {
+      active = false
+    }
+  }, [])
+
+  async function enterVr() {
+    try {
+      await xrStore.enterVR()
+    } catch (error) {
+      setXrStatus(error instanceof Error ? `VR failed: ${error.message}` : 'VR failed.')
+    }
+  }
+
+  return (
+    <main className="app-shell">
+      <div className="top-bar">
+        <div>
+          <strong>21 Hold'em VR</strong>
+          <span>{xrStatus}</span>
+        </div>
+        <div className="top-actions">
+          {view === 'table' ? (
+            <button className="secondary-entry" type="button" onClick={() => setView('lobby')}>
+              Lobby
+            </button>
+          ) : null}
+          <button className="vr-entry" type="button" onClick={() => void enterVr()}>
+            Enter VR
+          </button>
+        </div>
+      </div>
+
+      {view === 'lobby' ? (
+        <Lobby onStart={() => setView('table')} />
+      ) : (
+        <>
+          <Canvas camera={{ position: [0, 2.25, 3.2], fov: 52 }} shadows>
+            <XR store={xrStore}>
+              <XROrigin position={[0, 0, 1.65]} />
+              <TableScene />
+            </XR>
+          </Canvas>
+          <TableHud />
+          <DebugPanel />
+        </>
+      )}
+    </main>
+  )
+}
+
+function DebugPanel() {
+  const game = useGameStore((state) => state.game)
+  const showDebugTrace = useGameStore((state) => state.settings.showDebugTrace)
+  const summary = useMemo(() => buildHandDebugSummary(game), [game])
+
+  if (!showDebugTrace) {
+    return null
+  }
+
+  return (
+    <details className="debug-panel">
+      <summary>Hand Trace</summary>
+      <pre>{JSON.stringify(summary, null, 2)}</pre>
+    </details>
+  )
+}
+
+export default App
+
+function Lobby({ onStart }: { onStart: () => void }) {
+  const [panel, setPanel] = useState<'main' | 'how-to' | 'settings'>('main')
+  const settings = useGameStore((state) => state.settings)
+  const setAutoplayOpponents = useGameStore((state) => state.setAutoplayOpponents)
+  const setShowDebugTrace = useGameStore((state) => state.setShowDebugTrace)
+
+  return (
+    <section className="lobby-screen">
+      <div className="lobby-panel">
+        <div>
+          <h1>21 Hold'em VR</h1>
+          <p>Player-versus-player 21 scoring with poker pressure, side pots, and community-card decisions.</p>
+        </div>
+        {panel === 'main' ? (
+          <div className="lobby-actions">
+            <button type="button" onClick={onStart}>
+              Start Demo Table
+            </button>
+            <button type="button">Join Private Table</button>
+            <button type="button" onClick={() => setPanel('how-to')}>
+              How To Play
+            </button>
+            <button type="button" onClick={() => setPanel('settings')}>
+              Settings
+            </button>
+          </div>
+        ) : null}
+        {panel === 'how-to' ? <HowToPanel onBack={() => setPanel('main')} /> : null}
+        {panel === 'settings' ? (
+          <SettingsPanel
+            autoplayOpponents={settings.autoplayOpponents}
+            showDebugTrace={settings.showDebugTrace}
+            onAutoplayChange={setAutoplayOpponents}
+            onDebugChange={setShowDebugTrace}
+            onBack={() => setPanel('main')}
+          />
+        ) : null}
+      </div>
+      <div className="lobby-summary">
+        <span>Quest Browser ready</span>
+        <span>3 seats</span>
+        <span>BB 1 / SB 0.5</span>
+        <span>1 private card</span>
+      </div>
+    </section>
+  )
+}
+
+function HowToPanel({ onBack }: { onBack: () => void }) {
+  return (
+    <div className="lobby-info-panel">
+      <p>Match the opening blind to stay in the hand. Build the best total of 21 or less.</p>
+      <p>Check means no bet and take the next community card. Stand keeps your current total but does not protect you from later betting.</p>
+      <p>Fold gives up all claim to the current hand. All-in caps your chips but keeps you eligible for pots you contributed to.</p>
+      <button type="button" onClick={onBack}>
+        Back
+      </button>
+    </div>
+  )
+}
+
+function SettingsPanel({
+  autoplayOpponents,
+  showDebugTrace,
+  onAutoplayChange,
+  onDebugChange,
+  onBack,
+}: {
+  autoplayOpponents: boolean
+  showDebugTrace: boolean
+  onAutoplayChange: (enabled: boolean) => void
+  onDebugChange: (enabled: boolean) => void
+  onBack: () => void
+}) {
+  return (
+    <div className="lobby-info-panel">
+      <label className="setting-row">
+        <span>Autoplay opponents</span>
+        <input type="checkbox" checked={autoplayOpponents} onChange={(event) => onAutoplayChange(event.target.checked)} />
+      </label>
+      <label className="setting-row">
+        <span>Show hand trace</span>
+        <input type="checkbox" checked={showDebugTrace} onChange={(event) => onDebugChange(event.target.checked)} />
+      </label>
+      <button type="button" onClick={onBack}>
+        Back
+      </button>
+    </div>
+  )
+}
+
+function TableHud() {
+  const game = useGameStore((state) => state.game)
+  const lastActionLabel = useGameStore((state) => state.lastActionLabel)
+  const applyAction = useGameStore((state) => state.applyAction)
+  const applyBotAction = useGameStore((state) => state.applyBotAction)
+  const startNextHand = useGameStore((state) => state.startNextHand)
+  const autoplayOpponents = useGameStore((state) => state.settings.autoplayOpponents)
+  const actionMenu = useGameStore((state) => state.actionMenu)
+  const selectedRaiseTo = useGameStore((state) => state.selectedRaiseTo)
+  const stagedBetAction = useGameStore((state) => state.stagedBetAction)
+  const setActionMenu = useGameStore((state) => state.setActionMenu)
+  const setStagedBetAction = useGameStore((state) => state.setStagedBetAction)
+  const legalActions = useMemo(() => getLegalActions(game, game.activePlayerId), [game])
+  const { pots, refunds } = useMemo(() => buildPots(game.players), [game.players])
+  const showdown = useMemo(() => (game.phase === 'showdown' ? resolveShowdown(game) : null), [game])
+  const raiseOptions = useMemo(() => getRaiseOptions(game, game.activePlayerId), [game])
+  const isHumanTurn = game.activePlayerId === 'p1'
+
+  useEffect(() => {
+    if (!autoplayOpponents || !game.activePlayerId || isHumanTurn || game.phase === 'showdown') {
+      return
+    }
+
+    const botAction = chooseBotAction(game, game.activePlayerId)
+    if (!botAction) {
+      return
+    }
+
+    const timeout = window.setTimeout(() => applyBotAction(botAction), 900)
+    return () => window.clearTimeout(timeout)
+  }, [applyBotAction, autoplayOpponents, game, isHumanTurn])
+
+  return (
+    <section className="table-hud" aria-label="Current hand state">
+      <div>
+        <strong>{lastActionLabel}</strong>
+        {showdown ? (
+          <>
+            <span>{`Awards: ${showdown.awards.map((award) => formatAward(award.winnerIds, award.amount, game)).join(' / ')}`}</span>
+            <span>{`Payouts: ${formatPayouts(showdown.payouts, game)}`}</span>
+          </>
+        ) : (
+          <>
+            <span>{`Pots: ${pots.map((pot) => formatChips(pot.amount)).join(' / ') || '0'}`}</span>
+            <span>{`Refunds: ${formatRefunds(refunds)}`}</span>
+          </>
+        )}
+      </div>
+      <div className="hud-actions">
+        {!isHumanTurn && game.phase !== 'showdown' ? <span className="bot-thinking">Opponent thinking...</span> : null}
+        {isHumanTurn ? (
+          <ActionMenuButtons
+            menu={actionMenu}
+            legalActions={legalActions}
+            raiseOptions={raiseOptions}
+            selectedRaiseTo={selectedRaiseTo}
+            stagedBetAction={stagedBetAction}
+            onAction={applyAction}
+            onMenu={setActionMenu}
+            onStagedBet={setStagedBetAction}
+          />
+        ) : null}
+        {game.phase === 'showdown' ? (
+          <button type="button" onClick={startNextHand}>
+            Next Hand
+          </button>
+        ) : null}
+      </div>
+    </section>
+  )
+}
+
+function ActionMenuButtons({
+  menu,
+  legalActions,
+  raiseOptions,
+  selectedRaiseTo,
+  stagedBetAction,
+  onAction,
+  onMenu,
+  onStagedBet,
+}: {
+  menu: ReturnType<typeof useGameStore.getState>['actionMenu']
+  legalActions: ReturnType<typeof getLegalActions>
+  raiseOptions: ReturnType<typeof getRaiseOptions>
+  selectedRaiseTo: number
+  stagedBetAction: ReturnType<typeof useGameStore.getState>['stagedBetAction']
+  onAction: ReturnType<typeof useGameStore.getState>['applyAction']
+  onMenu: ReturnType<typeof useGameStore.getState>['setActionMenu']
+  onStagedBet: ReturnType<typeof useGameStore.getState>['setStagedBetAction']
+}) {
+  if (menu === 'raise-size' && raiseOptions) {
+    return (
+      <>
+        <span className="raise-stack-hint">{`Select chip stack | ${formatChips(selectedRaiseTo || raiseOptions.min)}`}</span>
+        <button className={hudButtonClass('Cancel')} type="button" onClick={() => onMenu('main')}>
+          Cancel
+        </button>
+      </>
+    )
+  }
+
+  if (menu === 'raise-intent') {
+    return (
+      <>
+        <button
+          className={hudButtonClass('Confirm')}
+          type="button"
+          onClick={() => onAction({ type: 'raise', amount: selectedRaiseTo, intent: 'confirm' })}
+        >
+          Confirm
+        </button>
+        <button
+          className={hudButtonClass('Stand')}
+          type="button"
+          onClick={() => onAction({ type: 'raise', amount: selectedRaiseTo, intent: 'stand' })}
+        >
+          Stand
+        </button>
+        <button className={hudButtonClass('Cancel')} type="button" onClick={() => onMenu('raise-size')}>
+          Cancel
+        </button>
+      </>
+    )
+  }
+
+  if (menu === 'bet-intent' && stagedBetAction) {
+    return (
+      <>
+        <button className={hudButtonClass('Confirm')} type="button" onClick={() => onAction(stagedActionWithIntent(stagedBetAction, 'confirm'))}>
+          Confirm
+        </button>
+        <button className={hudButtonClass('Stand')} type="button" onClick={() => onAction(stagedActionWithIntent(stagedBetAction, 'stand'))}>
+          Stand
+        </button>
+        <button
+          className={hudButtonClass('Cancel')}
+          type="button"
+          onClick={() => {
+            onStagedBet(null)
+            onMenu('main')
+          }}
+        >
+          Cancel
+        </button>
+      </>
+    )
+  }
+
+  return (
+    <>
+      {legalActions.map((action) =>
+        action.type === 'raise' ? (
+          <button key={action.type} className={hudButtonClass('Raise')} type="button" onClick={() => onMenu('raise-size')}>
+            Raise
+          </button>
+        ) : (
+          <button
+            key={action.type}
+            className={hudButtonClass(action.label)}
+            type="button"
+            onClick={() => onAction({ type: action.type })}
+          >
+            {action.label}
+          </button>
+        ),
+      )}
+    </>
+  )
+}
+
+function stagedActionWithIntent(
+  action: NonNullable<ReturnType<typeof useGameStore.getState>['stagedBetAction']>,
+  intent: 'confirm' | 'stand',
+) {
+  if (action.type === 'call') {
+    return { type: 'call' as const, intent }
+  }
+
+  if (action.type === 'raise') {
+    return { ...action, intent }
+  }
+
+  return action
+}
+
+function hudButtonClass(label: string) {
+  const action = label.toLowerCase()
+
+  if (action.includes('raise') || action.startsWith('min') || action.startsWith('half') || action.startsWith('pot')) {
+    return 'hud-button hud-button-raise'
+  }
+
+  if (action.includes('stand')) {
+    return 'hud-button hud-button-stand'
+  }
+
+  return 'hud-button hud-button-secondary'
+}
+
+function formatAward(winnerIds: string[], amount: number, game: ReturnType<typeof useGameStore.getState>['game']) {
+  if (winnerIds.length === 0) {
+    return `${formatChips(amount)} unresolved`
+  }
+
+  return `${formatChips(amount)} to ${winnerIds.map((id) => playerName(game, id)).join(' + ')}`
+}
+
+function formatPayouts(payouts: Record<string, number>, game: ReturnType<typeof useGameStore.getState>['game']) {
+  const entries = Object.entries(payouts)
+  if (entries.length === 0) {
+    return 'none'
+  }
+
+  return entries.map(([id, amount]) => `${playerName(game, id)} ${formatChips(amount)}`).join(', ')
+}
+
+function formatRefunds(refunds: Record<string, number>) {
+  return (
+    Object.entries(refunds)
+      .map(([id, amount]) => `${id} ${formatChips(amount)}`)
+      .join(', ') || 'none'
+  )
+}
+
+function playerName(game: ReturnType<typeof useGameStore.getState>['game'], playerId: string) {
+  return game.players.find((player) => player.id === playerId)?.name ?? playerId
+}
