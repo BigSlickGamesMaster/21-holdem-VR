@@ -207,26 +207,7 @@ export function TableScene() {
 
       {showdown ? (
         <>
-          {Object.entries(showdown.payouts).map(([playerId, amount]) => {
-            const player = game.players.find((candidate) => candidate.id === playerId)
-            if (!player || amount <= 0) {
-              return null
-            }
-
-            const position = seatPositions[player.seat]
-            return (
-              <CanvasLabel
-                key={`winner-label-${playerId}`}
-                text={`+${formatChips(amount)}`}
-                position={[position[0] * 0.92, objectY, position[2] * 0.7]}
-                width={0.28}
-                height={0.08}
-                fontSize={44}
-                background="#5bf08d"
-                color="#0d2214"
-              />
-            )
-          })}
+          <ShowdownSeatResults game={game} showdown={showdown} />
           <TableConsole
             position={[consoleX, controlY, consoleZ]}
             width={consoleSize}
@@ -280,6 +261,98 @@ export function TableScene() {
       ) : null}
     </>
   )
+}
+
+function ShowdownSeatResults({
+  game,
+  showdown,
+}: {
+  game: ReturnType<typeof useGameStore.getState>['game']
+  showdown: NonNullable<ReturnType<typeof resolveShowdown>>
+}) {
+  const winningIds = new Set(showdown.awards.flatMap((award) => award.winnerIds))
+
+  return (
+    <group>
+      {game.players.map((player) => {
+        const position = seatPositions[player.seat]
+        const resultPosition = resultLabelPosition(player.seat, position)
+        const total = showdown.totals[player.id]
+        const payout = showdown.payouts[player.id] ?? 0
+        const result = showdownResultText({
+          payout,
+          total: total?.total ?? 0,
+          bust: total?.bust ?? false,
+          wonPot: winningIds.has(player.id),
+        })
+
+        return (
+          <group key={`showdown-result-${player.id}`}>
+            <CanvasLabel
+              text={result}
+              position={resultPosition}
+              rotation={[-Math.PI / 2, 0, cardYawForSeat(player.seat, position)]}
+              width={0.3}
+              height={0.08}
+              fontSize={68}
+              background="rgba(0, 0, 0, 0)"
+              color={result.startsWith('WIN') || result.startsWith('PUSH') ? '#5bf08d' : '#ffb4a8'}
+            />
+            <CanvasLabel
+              text={total?.bust ? `${total.total} BUST` : String(total?.total ?? '')}
+              position={totalLabelPosition(player.seat, position)}
+              rotation={[-Math.PI / 2, 0, cardYawForSeat(player.seat, position)]}
+              width={0.22}
+              height={0.065}
+              fontSize={60}
+              background="rgba(0, 0, 0, 0)"
+              color={total?.bust ? '#ff7474' : '#f7f9ff'}
+            />
+          </group>
+        )
+      })}
+    </group>
+  )
+}
+
+function showdownResultText({
+  payout,
+  total,
+  bust,
+  wonPot,
+}: {
+  payout: number
+  total: number
+  bust: boolean
+  wonPot: boolean
+}) {
+  if (bust) {
+    return 'BUST'
+  }
+
+  if (wonPot) {
+    return `WIN +${formatChips(payout)}`
+  }
+
+  if (payout > 0) {
+    return `PUSH +${formatChips(payout)}`
+  }
+
+  return `LOSE ${total}`
+}
+
+function resultLabelPosition(seat: number, seatPosition: [number, number, number]): [number, number, number] {
+  const cardBase = playerCardBase(seat, seatPosition, objectY)
+  const { inward } = seatFrameForSeat(seat, seatPosition)
+
+  return [cardBase[0] + inward[0] * 0.27, objectY + 0.006, cardBase[2] + inward[1] * 0.27]
+}
+
+function totalLabelPosition(seat: number, seatPosition: [number, number, number]): [number, number, number] {
+  const cardBase = playerCardBase(seat, seatPosition, objectY)
+  const { left } = seatFrameForSeat(seat, seatPosition)
+
+  return [cardBase[0] - left[0] * 0.16, objectY + 0.006, cardBase[2] - left[1] * 0.16]
 }
 
 function AllInMarker({ seat, seatPosition }: { seat: number; seatPosition: [number, number, number] }) {
