@@ -2,6 +2,7 @@ import { useFrame } from '@react-three/fiber'
 import { useEffect, useRef, useState } from 'react'
 import { Group, Vector3 } from 'three'
 import type { Card } from '../../game/types/cards'
+import { CanvasLabel } from '../vr/CanvasLabel'
 import { CardView } from './CardView'
 
 type DealtCardProps = {
@@ -188,6 +189,19 @@ export function DealtCard({
           <planeGeometry args={[0.19 + standProgress * 0.03, 0.25 + standProgress * 0.03]} />
           <meshBasicMaterial color="#4f8cff" transparent opacity={0.1 + standProgress * 0.34} depthWrite={false} />
         </mesh>
+      ) : null}
+      {canHoverToStand && standProgress > 0 ? (
+        <group position={[0, 0.007, -0.16]} scale={0.35 + standProgress * 0.95}>
+          <CanvasLabel
+            text="STAND"
+            position={[0, 0, 0]}
+            width={0.22}
+            height={0.065}
+            fontSize={96}
+            background="rgba(0, 0, 0, 0)"
+            color="#8db8ff"
+          />
+        </group>
       ) : null}
       <CardView card={card} position={[0, 0, 0]} faceUp={faceUp} />
     </group>
