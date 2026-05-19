@@ -1,21 +1,30 @@
 import type { GameState } from '../types/game'
 
 export type ChipPiece = {
-  value: 1 | 0.5
+  value: 10 | 5 | 1 | 0.5
   color: string
 }
 
+const chipDenominations: ChipPiece[] = [
+  { value: 10, color: '#e7772e' },
+  { value: 5, color: '#c74343' },
+  { value: 1, color: '#a9afb8' },
+  { value: 0.5, color: '#f1e6c7' },
+]
+
 export function chipPiecesForAmount(amount: number): ChipPiece[] {
-  const wholeChips = Math.floor(roundToHalf(amount))
-  const hasHalfChip = roundToHalf(amount - wholeChips) >= 0.5
   const chips: ChipPiece[] = []
+  let remaining = roundToHalf(amount)
 
-  for (let index = 0; index < wholeChips; index += 1) {
-    chips.push({ value: 1, color: '#d6c27a' })
-  }
+  for (const denomination of chipDenominations) {
+    while (remaining >= denomination.value) {
+      chips.push(denomination)
+      remaining = roundToHalf(remaining - denomination.value)
+    }
 
-  if (hasHalfChip) {
-    chips.push({ value: 0.5, color: '#b74343' })
+    if (remaining <= 0) {
+      break
+    }
   }
 
   return chips

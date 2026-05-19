@@ -19,6 +19,7 @@ type DealtCardProps = {
   onFoldRelease?: () => void
   canHoverToStand?: boolean
   onStandHover?: () => void
+  warningGlow?: boolean
 }
 
 const deckPosition = new Vector3(0.52, 1.02, 0.12)
@@ -39,6 +40,7 @@ export function DealtCard({
   onFoldRelease,
   canHoverToStand = false,
   onStandHover,
+  warningGlow = false,
 }: DealtCardProps) {
   const groupRef = useRef<Group>(null)
   const startTimeRef = useRef<number | null>(null)
@@ -175,6 +177,12 @@ export function DealtCard({
         setStandProgress(0)
       }}
     >
+      {warningGlow ? (
+        <mesh position={[0, 0.0035, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+          <planeGeometry args={[0.22, 0.28]} />
+          <meshBasicMaterial color="#ff3b35" transparent opacity={0.24} depthWrite={false} />
+        </mesh>
+      ) : null}
       {canHoverToStand ? (
         <mesh position={[0, 0.003, 0]} rotation={[-Math.PI / 2, 0, 0]}>
           <planeGeometry args={[0.19 + standProgress * 0.03, 0.25 + standProgress * 0.03]} />

@@ -4,13 +4,12 @@ import { applyPlayerAction } from './handEngine'
 import { chipPiecesForAmount, chipValueForPieces, trackedChipValue } from './chipInventory'
 
 describe('chipInventory', () => {
-  it('represents demo chip values with exact one and half chip pieces', () => {
-    expect(chipPiecesForAmount(10)).toHaveLength(10)
-    expect(chipValueForPieces(chipPiecesForAmount(10))).toBe(10)
+  it('represents demo chip values with exact casino denominations', () => {
+    expect(chipPiecesForAmount(10)).toEqual([{ value: 10, color: '#e7772e' }])
 
     const nineAndHalf = chipPiecesForAmount(9.5)
-    expect(nineAndHalf).toHaveLength(10)
-    expect(nineAndHalf.filter((chip) => chip.value === 1)).toHaveLength(9)
+    expect(nineAndHalf.filter((chip) => chip.value === 5)).toHaveLength(1)
+    expect(nineAndHalf.filter((chip) => chip.value === 1)).toHaveLength(4)
     expect(nineAndHalf.filter((chip) => chip.value === 0.5)).toHaveLength(1)
     expect(chipValueForPieces(nineAndHalf)).toBe(9.5)
   })

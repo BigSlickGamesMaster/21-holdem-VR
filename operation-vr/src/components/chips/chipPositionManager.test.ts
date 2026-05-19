@@ -19,7 +19,7 @@ describe('chipPositionManager', () => {
     const manager = createChipPositionManager()
     const placements = manager.placementsForAmount(9.5, 'pot')
 
-    expect(placements).toHaveLength(10)
+    expect(placements).toHaveLength(6)
     expect(chipValueForPieces(placements.map((placement) => placement.chip))).toBe(9.5)
   })
 })

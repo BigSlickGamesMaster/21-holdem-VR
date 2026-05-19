@@ -89,6 +89,7 @@ export function TableScene() {
     (game.pots ?? []).reduce((sum, pot) => sum + pot.amount, 0) +
     currentRoundPots.reduce((sum, pot) => sum + pot.amount, 0)
   const callAction = legalActions.find((action) => action.type === 'call')
+  const facingBet = isHumanTurn && actionMenu === 'main' && callAction?.type === 'call'
   const canTapCheck = isHumanTurn && actionMenu === 'main' && legalActions.some((action) => action.type === 'check')
   const canFold = isHumanTurn && actionMenu === 'main' && legalActions.some((action) => action.type === 'fold')
   const canStand = isHumanTurn && actionMenu === 'main' && legalActions.some((action) => action.type === 'stand')
@@ -165,6 +166,7 @@ export function TableScene() {
             onFoldRelease={throwCardToFold}
             canHoverToStand={player.id === 'p1' && cardIndex === 0 && (canStand || canStandStagedBet) && !activeFoldThrow}
             onStandHover={standFromCardHover}
+            warningGlow={player.id === 'p1' && cardIndex === 0 && facingBet && !activeFoldThrow}
           />
         ))
       })}
@@ -528,23 +530,25 @@ function TableSurfaceMarks({
           opacity={nextHandActive ? 0.5 : 0.18}
         />
       ) : null}
-      <SurfaceSlot
-        position={[consoleX, markY, consoleZ]}
-        width={consoleSize}
-        depth={consoleSize}
-        color={consoleColor}
-        opacity={consoleOpacity}
-      />
       {consoleText ? (
-        <CanvasLabel
-          text={consoleText}
-          position={[consoleX, markY + 0.004, consoleZ]}
-          width={consoleSize * 0.82}
-          height={consoleSize * 0.28}
-          fontSize={nextHandActive ? 72 : 104}
-          background="rgba(0, 0, 0, 0)"
-          color={consoleTextColor}
-        />
+        <>
+          <SurfaceSlot
+            position={[consoleX, markY, consoleZ]}
+            width={consoleSize}
+            depth={consoleSize}
+            color={consoleColor}
+            opacity={consoleOpacity}
+          />
+          <CanvasLabel
+            text={consoleText}
+            position={[consoleX, markY + 0.004, consoleZ]}
+            width={consoleSize * 0.82}
+            height={consoleSize * 0.28}
+            fontSize={nextHandActive ? 72 : 104}
+            background="rgba(0, 0, 0, 0)"
+            color={consoleTextColor}
+          />
+        </>
       ) : null}
     </group>
   )
