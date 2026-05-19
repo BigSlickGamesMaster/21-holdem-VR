@@ -21,6 +21,7 @@ type DealtCardProps = {
   canHoverToStand?: boolean
   onStandHover?: () => void
   warningGlow?: boolean
+  opacity?: number
 }
 
 const deckPosition = new Vector3(0.52, 1.02, 0.12)
@@ -42,6 +43,7 @@ export function DealtCard({
   canHoverToStand = false,
   onStandHover,
   warningGlow = false,
+  opacity = 1,
 }: DealtCardProps) {
   const groupRef = useRef<Group>(null)
   const startTimeRef = useRef<number | null>(null)
@@ -180,14 +182,14 @@ export function DealtCard({
     >
       {warningGlow ? (
         <mesh position={[0, 0.0035, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-          <planeGeometry args={[0.22, 0.28]} />
-          <meshBasicMaterial color="#ff3b35" transparent opacity={0.24} depthWrite={false} />
+          <planeGeometry args={[0.164, 0.224]} />
+          <meshBasicMaterial color="#ff3b35" transparent opacity={0.36} depthWrite={false} />
         </mesh>
       ) : null}
       {canHoverToStand ? (
         <mesh position={[0, 0.003, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-          <planeGeometry args={[0.19 + standProgress * 0.03, 0.25 + standProgress * 0.03]} />
-          <meshBasicMaterial color="#4f8cff" transparent opacity={0.1 + standProgress * 0.34} depthWrite={false} />
+          <planeGeometry args={[0.164, 0.224]} />
+          <meshBasicMaterial color="#4f8cff" transparent opacity={0.2 + standProgress * 0.36} depthWrite={false} />
         </mesh>
       ) : null}
       {canHoverToStand && standProgress > 0 ? (
@@ -203,7 +205,7 @@ export function DealtCard({
           />
         </group>
       ) : null}
-      <CardView card={card} position={[0, 0, 0]} faceUp={faceUp} />
+      <CardView card={card} position={[0, 0, 0]} faceUp={faceUp} opacity={opacity} />
     </group>
   )
 }

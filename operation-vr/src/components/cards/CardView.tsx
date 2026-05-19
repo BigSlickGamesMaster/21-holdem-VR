@@ -6,19 +6,20 @@ type CardViewProps = {
   card: Card
   position: [number, number, number]
   faceUp?: boolean
+  opacity?: number
 }
 
-export function CardView({ card, position, faceUp = true }: CardViewProps) {
+export function CardView({ card, position, faceUp = true, opacity = 1 }: CardViewProps) {
   const texture = useMemo(() => createCardTexture(card, faceUp), [card, faceUp])
 
   return (
     <group position={position} rotation={[-Math.PI / 2, 0, 0]}>
       <mesh castShadow receiveShadow>
         <planeGeometry args={[0.16, 0.22]} />
-        <meshBasicMaterial map={texture} transparent side={DoubleSide} />
-      </mesh>
-    </group>
-  )
+      <meshBasicMaterial map={texture} transparent opacity={opacity} side={DoubleSide} />
+    </mesh>
+  </group>
+)
 }
 
 function createCardTexture(card: Card, faceUp: boolean) {

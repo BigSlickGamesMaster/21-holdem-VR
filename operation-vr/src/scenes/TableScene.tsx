@@ -189,7 +189,8 @@ export function TableScene() {
             target={holeCardTarget(player.seat, position, cardIndex)}
             delay={(cardIndex * game.players.length + playerIndex) * 0.12}
             faceUp={(player.id === 'p1' && !activeFoldThrow) || game.phase === 'showdown'}
-            visible={!(player.id === 'p1' && activeFoldThrow)}
+            visible
+            opacity={player.id === 'p1' && player.state === 'folded' ? 0.5 : 1}
             rotationY={cardYawForSeat(player.seat)}
             canPickUpToFold={player.id === 'p1' && cardIndex === 0 && canFold && !activeFoldThrow}
             foldLineZ={foldLineZ}
