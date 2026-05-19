@@ -160,7 +160,7 @@ export function TableScene() {
             delay={(cardIndex * game.players.length + playerIndex) * 0.12}
             faceUp={(player.id === 'p1' && !activeFoldThrow) || game.phase === 'showdown'}
             visible={!(player.id === 'p1' && activeFoldThrow)}
-            rotationY={cardYawForSeat(player.seat, position)}
+            rotationY={cardYawForSeat(player.seat)}
             canPickUpToFold={player.id === 'p1' && cardIndex === 0 && canFold && !activeFoldThrow}
             foldLineZ={foldLineZ}
             onFoldRelease={throwCardToFold}
@@ -293,7 +293,7 @@ function ShowdownSeatResults({
             <CanvasLabel
               text={result}
               position={resultPosition}
-              rotation={[-Math.PI / 2, 0, cardYawForSeat(player.seat, position)]}
+              rotation={[-Math.PI / 2, 0, cardYawForSeat(player.seat)]}
               width={0.3}
               height={0.08}
               fontSize={68}
@@ -303,7 +303,7 @@ function ShowdownSeatResults({
             <CanvasLabel
               text={total?.bust ? `${total.total} BUST` : String(total?.total ?? '')}
               position={totalLabelPosition(player.seat, position)}
-              rotation={[-Math.PI / 2, 0, cardYawForSeat(player.seat, position)]}
+              rotation={[-Math.PI / 2, 0, cardYawForSeat(player.seat)]}
               width={0.22}
               height={0.065}
               fontSize={60}
@@ -370,7 +370,7 @@ function AllInMarker({ seat, seatPosition }: { seat: number; seatPosition: [numb
     <CanvasLabel
       text="ALL-IN"
       position={position}
-      rotation={[-Math.PI / 2, 0, cardYawForSeat(seat, seatPosition)]}
+      rotation={[-Math.PI / 2, 0, cardYawForSeat(seat)]}
       width={0.22}
       height={0.07}
       fontSize={86}
@@ -503,7 +503,7 @@ function TableSurfaceMarks({
           <SurfaceSlot
             key={`player-card-slot-${player.id}`}
             position={holeCardTarget(player.seat, position, 0, markY)}
-            rotationY={cardYawForSeat(player.seat, position)}
+            rotationY={cardYawForSeat(player.seat)}
             width={0.2}
             depth={0.27}
             color="#8fb4ff"
@@ -710,16 +710,12 @@ function communityCardPosition(index: number, y = objectY): [number, number, num
   return [-0.4 + index * 0.2, y, -0.26]
 }
 
-function cardYawForPosition(position: [number, number, number]) {
-  return Math.atan2(position[0], position[2])
-}
-
-function cardYawForSeat(seat: number, position: [number, number, number]) {
+function cardYawForSeat(seat: number) {
   if (seat !== 1) {
     return opponentTrackSlot(seat).yaw
   }
 
-  return cardYawForPosition(playerCardBase(seat, position, objectY))
+  return 0
 }
 
 function chipStackPosition(seat: number, position: [number, number, number]): [number, number, number] {
