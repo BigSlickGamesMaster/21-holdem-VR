@@ -1,7 +1,7 @@
 import { create } from 'zustand'
-import { createDemoHand, demoHand, type DemoSeat } from '../mockData/demoHand'
+import { createDemoHand, demoHand } from '../mockData/demoHand'
+import { seatsForNextHand } from '../rules/chipSettlement'
 import { applyPlayerAction } from '../rules/handEngine'
-import { resolveShowdown } from '../rules/showdown'
 import type { GameState, PlayerActionInput } from '../types/game'
 
 export type ActionMenu = 'main' | 'raise-size' | 'raise-intent' | 'bet-intent'
@@ -87,24 +87,19 @@ export const useGameStore = create<GameStore>((set) => ({
   setSelectedRaiseTo: (amount) => set({ selectedRaiseTo: amount }),
   setStagedBetAction: (action) => set({ stagedBetAction: action }),
   startNextHand: () =>
-    set((state) => ({
-      game: createDemoHand(nextSeatsFrom(state.game), state.handNumber + 1),
-      handNumber: state.handNumber + 1,
-      dealAnimationKey: state.dealAnimationKey + 1,
-      actionMenu: 'main',
-      selectedRaiseTo: 0,
-      stagedBetAction: null,
-      lastActionLabel: `Hand ${state.handNumber + 2} started. Blinds posted.`,
-    })),
+    set((state) => {
+      if (state.game.phase !== 'showdown') {
+        return state
+      }
+
+      return {
+        game: createDemoHand(seatsForNextHand(state.game), state.handNumber + 1),
+        handNumber: state.handNumber + 1,
+        dealAnimationKey: state.dealAnimationKey + 1,
+        actionMenu: 'main',
+        selectedRaiseTo: 0,
+        stagedBetAction: null,
+        lastActionLabel: `Hand ${state.handNumber + 2} started. Blinds posted.`,
+      }
+    }),
 }))
-
-function nextSeatsFrom(game: GameState): DemoSeat[] {
-  const payouts = game.phase === 'showdown' ? resolveShowdown(game).payouts : {}
-
-  return game.players.map((player) => ({
-    id: player.id,
-    seat: player.seat,
-    name: player.name,
-    chips: player.chips + (payouts[player.id] ?? 0),
-  }))
-}
