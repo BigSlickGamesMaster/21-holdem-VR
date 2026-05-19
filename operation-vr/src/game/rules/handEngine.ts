@@ -138,7 +138,7 @@ function progressCompletedRound(game: GameState): GameState {
 
   if (deck.length > 0 && settledGame.communityCards.length < maxCommunityCards) {
     const [nextCard, ...remainingDeck] = deck
-    const nextGame = {
+    const nextGame = markBusts({
       ...settledGame,
       phase: 'community-card' as const,
       communityCards: [...settledGame.communityCards, nextCard],
@@ -149,7 +149,7 @@ function progressCompletedRound(game: GameState): GameState {
           ? { ...player, acceptedCommunityCount: player.acceptedCommunityCount + 1 }
           : player,
       ),
-    }
+    })
 
     const nextPlayer = findNextDecisionPlayer(nextGame)
     return {

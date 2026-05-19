@@ -192,6 +192,40 @@ describe('applyPlayerAction', () => {
     expect(result.game.players[1].acceptedCommunityCount).toBe(1)
   })
 
+  it('marks players bust immediately after community-card intake and skips their next decision', () => {
+    const result = applyPlayerAction(
+      {
+        ...gameWith([
+          {
+            ...basePlayer,
+            id: 'p1',
+            chips: 500,
+            contribution: 400,
+            holeCards: [
+              { rank: '10', suit: 'spades' },
+              { rank: '9', suit: 'hearts' },
+            ],
+          },
+          {
+            ...basePlayer,
+            id: 'p2',
+            chips: 500,
+            contribution: 400,
+            holeCards: [{ rank: '2', suit: 'clubs' }],
+          },
+        ]),
+        deck: [{ rank: '5', suit: 'diamonds' }],
+        maxCommunityCards: 1,
+        actedThisRound: ['p2'],
+      },
+      'p1',
+      { type: 'check' },
+    )
+
+    expect(result.game.players[0]).toMatchObject({ state: 'bust', acceptedCommunityCount: 1 })
+    expect(result.game.activePlayerId).toBe('p2')
+  })
+
   it('does not give future community cards to standing players', () => {
     const result = applyPlayerAction(
       {
