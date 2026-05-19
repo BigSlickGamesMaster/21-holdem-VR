@@ -77,13 +77,18 @@ export function RaiseChipSelector({ options, callAmount, callAllIn = false, posi
       const progress = Math.max(0, Math.min(1, (elapsed - delay) / 0.52))
       const eased = 1 - Math.pow(1 - progress, 3)
       const highlighted = index >= stackChips.length - litChips
-      const lift = highlighted ? 0.012 : 0
+      const currentPop = typeof chip.userData.selectionPop === 'number' ? chip.userData.selectionPop : 0
+      const targetPop = highlighted ? 1 : 0
+      const selectionPop = currentPop + (targetPop - currentPop) * 0.24
       const sourceX = -0.2
       const sourceY = -0.035
       const sourceZ = 0.34
-      const finalX = Math.sin(index * 0.82) * 0.008
-      const finalZ = Math.cos(index * 0.72) * 0.008
-      const targetY = index * chipSpacing + lift
+      const baseX = Math.sin(index * 0.82) * 0.008
+      const baseZ = Math.cos(index * 0.72) * 0.008
+      const finalX = baseX + selectionPop * 0.042
+      const finalZ = baseZ - selectionPop * 0.018
+      const targetY = index * chipSpacing + selectionPop * 0.068
+      chip.userData.selectionPop = selectionPop
 
       if (resolvingSelection) {
         resolveStartRef.current ??= state.clock.elapsedTime
